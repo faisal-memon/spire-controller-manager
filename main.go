@@ -294,6 +294,17 @@ func run(ctrlConfig spirev1alpha1.ControllerManagerConfig, options ctrl.Options)
 		return err
 	}
 
+	if err = (&controllers.EndpointsReconciler{
+		Client: mgr.GetClient(),
+
+		Scheme:           mgr.GetScheme(),
+		Triggerer:        entryReconciler,
+		IgnoreNamespaces: ctrlConfig.IgnoreNamespaces,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Endpoints")
+		return err
+	}
+
 	if err = mgr.Add(manager.RunnableFunc(entryReconciler.Run)); err != nil {
 		setupLog.Error(err, "unable to manage entry reconciler")
 		return err

@@ -242,7 +242,13 @@ func (r *entryReconciler) renderPodEntry(ctx context.Context, spec *spirev1alpha
 	if err := r.config.K8sClient.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, node); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
-	return renderPodEntry(spec, node, pod, r.config.TrustDomain, r.config.ClusterName, r.config.ClusterDomain)
+	endpointsList := &corev1.EndpointsList{}
+	if spec.AutoPopulateDNSNames {
+		if err := r.config.K8sClient.List(ctx, endpointsList, client.InNamespace(pod.Namespace), client.MatchingFields{reconciler.EndpointUID: string(pod.UID)}); err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	return renderPodEntry(spec, node, pod, endpointsList, r.config.TrustDomain, r.config.ClusterName, r.config.ClusterDomain)
 }
 
 func (r *entryReconciler) createEntries(ctx context.Context, declaredEntries []declaredEntry) {

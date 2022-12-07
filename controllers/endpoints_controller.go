@@ -28,8 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// PodReconciler reconciles a Pod object
-type PodReconciler struct {
+// EndpointReconciler reconciles a Pod object
+type EndpointsReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
 	Triggerer        reconciler.Triggerer
@@ -41,12 +41,12 @@ type PodReconciler struct {
 //+kubebuilder:rbac:groups=spire.spiffe.io,resources=clusterspiffeids/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, err error) {
+func (r *EndpointsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, err error) {
 	if !r.IgnoreNamespaces.In(req.Namespace) {
 		log.FromContext(ctx).V(1).Info("Triggering reconciliation")
 		r.Triggerer.Trigger()
@@ -55,32 +55,8 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Index endpoints by UID. Later when we reconcile the Pod this will make it easy to find the associated endpoints
-	// and auto populate DNS names.
-	err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Endpoints{}, reconciler.EndpointUID, func(rawObj client.Object) []string {
-		endpoints := rawObj.(*corev1.Endpoints)
-		var podUIDs []string
-		for _, subset := range endpoints.Subsets {
-			for _, address := range subset.Addresses {
-				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-					podUIDs = append(podUIDs, string(address.TargetRef.UID))
-				}
-			}
-			for _, address := range subset.NotReadyAddresses {
-				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-					podUIDs = append(podUIDs, string(address.TargetRef.UID))
-				}
-			}
-		}
-
-		return podUIDs
-	})
-	if err != nil {
-		return err
-	}
-
+func (r *EndpointsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Pod{}).
+		For(&corev1.Endpoints{}).
 		Complete(r)
 }

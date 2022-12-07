@@ -40,13 +40,29 @@ func TestRenderPodEntry(t *testing.T) {
 			ServiceAccountName: "test",
 		},
 	}
+	endpointsList := &corev1.EndpointsList{
+		Items: []corev1.Endpoints{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "endpoint",
+					Namespace: "namespace",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-endpoint",
+					Namespace: "namespace",
+				},
+			},
+		},
+	}
 
 	parsedSpec, err := spirev1alpha1.ParseClusterSPIFFEIDSpec(spec)
 	require.NoError(t, err)
 	td, err := spiffeid.TrustDomainFromString(trustDomain)
 	require.NoError(t, err)
 
-	entry, err := renderPodEntry(parsedSpec, node, pod, td, clusterName, clusterDomain)
+	entry, err := renderPodEntry(parsedSpec, node, pod, endpointsList, td, clusterName, clusterDomain)
 	require.NoError(t, err)
 
 	// SPIFFE ID rendered correctly
@@ -59,8 +75,23 @@ func TestRenderPodEntry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, entry.ParentID.String(), parentID.String())
 
-	// DNS names rendered correctly and are unique
-	require.Len(t, entry.DNSNames, len(spec.DNSNameTemplates)-1)
+	// DNS names are unique
+	dnsNamesSet := make(map[string]struct{})
+	for _, dnsName := range entry.DNSNames {
+		_, exists := dnsNamesSet[dnsName]
+		require.False(t, exists)
+		dnsNamesSet[dnsName] = struct{}{}
+	}
+
+	// DNS names templates rendered correctly
 	require.Contains(t, entry.DNSNames, pod.Name+"."+pod.Namespace+".svc."+clusterDomain)
 	require.Contains(t, entry.DNSNames, pod.Name+"."+trustDomain+".svc")
+
+	// Endpoint DNS Names auto populated
+	for _, endpoint := range endpointsList.Items {
+		require.Contains(t, entry.DNSNames, endpoint.Name)
+		require.Contains(t, entry.DNSNames, endpoint.Name+"."+endpoint.Namespace)
+		require.Contains(t, entry.DNSNames, endpoint.Name+"."+endpoint.Namespace+".svc")
+		require.Contains(t, entry.DNSNames, endpoint.Name+"."+endpoint.Namespace+".svc."+clusterDomain)
+	}
 }

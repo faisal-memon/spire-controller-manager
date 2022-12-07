@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -30,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func renderPodEntry(spec *spirev1alpha1.ParsedClusterSPIFFEIDSpec, node *corev1.Node, pod *corev1.Pod, trustDomain spiffeid.TrustDomain, clusterName, clusterDomain string) (*spireapi.Entry, error) {
+func renderPodEntry(spec *spirev1alpha1.ParsedClusterSPIFFEIDSpec, node *corev1.Node, pod *corev1.Pod, endpointsList *corev1.EndpointsList, trustDomain spiffeid.TrustDomain, clusterName, clusterDomain string) (*spireapi.Entry, error) {
 	// We uniquely target the Pod running on the Node. The former is done
 	// via the k8s:pod-uid selector, the latter via the parent ID.
 	selectors := []spireapi.Selector{
@@ -58,18 +59,12 @@ func renderPodEntry(spec *spirev1alpha1.ParsedClusterSPIFFEIDSpec, node *corev1.
 
 	var dnsNames []string
 	dnsNamesSet := make(map[string]struct{})
-	for _, dnsNameTemplate := range spec.DNSNameTemplates {
-		dnsName, err := renderDNSName(dnsNameTemplate, data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to render DNS name: %w", err)
-		}
-
-		// Only add the DNS name if it doesn't already exist
-		if _, exists := dnsNamesSet[dnsName]; !exists {
-			dnsNamesSet[dnsName] = struct{}{}
-			dnsNames = append(dnsNames, dnsName)
-		}
+	dnsNames = addServiceDNSNames(dnsNames, dnsNamesSet, endpointsList, clusterDomain)
+	dnsNames, err = addRenderedDNSNames(dnsNames, dnsNamesSet, spec.DNSNameTemplates, data)
+	if err != nil {
+		return nil, err
 	}
+	sort.Strings(dnsNames) // Sort the list to provide consistent results
 
 	for _, workloadSelectorTemplate := range spec.WorkloadSelectorTemplates {
 		selector, err := renderSelector(workloadSelectorTemplate, data)
@@ -114,6 +109,32 @@ func renderSPIFFEID(tmpl *template.Template, data *templateData, expectTD spiffe
 		return spiffeid.ID{}, fmt.Errorf("invalid SPIFFE ID: expected trust domain %q but got %q", expectTD, id.TrustDomain())
 	}
 	return id, nil
+}
+
+func addServiceDNSNames(dnsNames []string, dnsNamesSet map[string]struct{}, endpointsList *corev1.EndpointsList, clusterDomain string) []string {
+	for _, endpoint := range endpointsList.Items {
+		dnsNames = appendIfNotExists(dnsNames, dnsNamesSet, endpoint.Name)
+		dnsNames = appendIfNotExists(dnsNames, dnsNamesSet, endpoint.Name+"."+endpoint.Namespace)
+		dnsNames = appendIfNotExists(dnsNames, dnsNamesSet, endpoint.Name+"."+endpoint.Namespace+".svc")
+		if clusterDomain != "" {
+			dnsNames = appendIfNotExists(dnsNames, dnsNamesSet, endpoint.Name+"."+endpoint.Namespace+".svc."+clusterDomain)
+		}
+	}
+
+	return dnsNames
+}
+
+func addRenderedDNSNames(dnsNames []string, dnsNamesSet map[string]struct{}, dnsNameTemplates []*template.Template, data *templateData) ([]string, error) {
+	for _, dnsNameTemplate := range dnsNameTemplates {
+		dnsName, err := renderDNSName(dnsNameTemplate, data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render DNS name: %w", err)
+		}
+
+		dnsNames = appendIfNotExists(dnsNames, dnsNamesSet, dnsName)
+	}
+
+	return dnsNames, nil
 }
 
 func renderDNSName(tmpl *template.Template, data *templateData) (string, error) {
@@ -166,4 +187,13 @@ func parseSelector(selector string) (spireapi.Selector, error) {
 		Type:  parts[0],
 		Value: parts[1],
 	}, nil
+}
+
+func appendIfNotExists(slice []string, sliceSet map[string]struct{}, item string) []string {
+	if _, exists := sliceSet[item]; !exists {
+		sliceSet[item] = struct{}{}
+		slice = append(slice, item)
+	}
+
+	return slice
 }
