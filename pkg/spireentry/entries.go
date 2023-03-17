@@ -27,7 +27,9 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	spirev1alpha1 "github.com/spiffe/spire-controller-manager/api/v1alpha1"
 	"github.com/spiffe/spire-controller-manager/pkg/spireapi"
+	"github.com/spiffe/spire/pkg/common/x509util"
 	corev1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -169,8 +171,7 @@ func renderTemplate(tmpl *template.Template, data *templateData) (string, error)
 }
 
 func validateDNSName(dnsName string) error {
-	// TODO:
-	return nil
+	return x509util.ValidateDNS(dnsName)
 }
 
 func parseSelector(selector string) (spireapi.Selector, error) {
