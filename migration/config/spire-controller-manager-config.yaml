@@ -17,6 +17,7 @@ data:
       resourceNamespace: spire
     clusterName: demo-cluster
     trustDomain: example.org
+    autoPopulateDNSNames: true
     ignoreNamespaces:
       - kube-system
       - kube-public

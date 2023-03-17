@@ -217,23 +217,14 @@ spec:
 
 ### Does SPIRE Controller Manager automatically populate DNS Names of Services a Pod is attached to?
 
-SPIRE Controller Manager doesn't monitor Endpoints like Kubernetes Workload Registrar did, so it won't do this automatically. A workaround is to use the `app` label to populate DNS Names using `dnsNameTemplates` field of the [ClusterSPIFFEID CRD](https://github.com/spiffe/spire-controller-manager/blob/main/docs/clusterspiffeid-crd.md), assuming you are using `app` as your selector and it matches the name of the `Service`.
+Yes, this is enabled with the sample configuration in this migration guide. To enable in your deployment follow these steps:
 
-```yaml
-apiVersion: spire.spiffe.io/v1alpha1
-kind: ClusterSPIFFEID
-metadata:
-  name: federation
-spec:
-  spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ns/{{ .PodMeta.Namespace }}/sa/{{ .PodSpec.ServiceAccountName }}"
-  podSelector:
-    matchLabels:
-      spiffe.io/spiffe-id: "true"
-  dnsNameTemplates: ["{{ index .PodMeta.Labels \"app\" }}.{{ .PodMeta.Namespace }}.svc.cluster.local"]
+1. Enable `autoPopulateDNSNames` globally in the [Controller Manager Config](https://github.com/spiffe/spire-controller-manager/blob/main/docs/clusterspiffeid-crd.md). See [example](config/spire-controller-manager-config.yaml).
+1. For each  [ClusterSPIFFEID](https://github.com/spiffe/spire-controller-manager/blob/main/docs/clusterspiffeid-crd.md) you to auto populate DNS names for, set the `autoPopulateDNSNames` field there. See [example](config/clusterspiffeid.yaml).
 
-```
 
-If you require these DNS Names to be automatically populated, please update [#48](https://github.com/spiffe/spire-controller-manager/issues/48) with your use case.
+> **Note**
+> Spire Controller Manager 0.2.3 or later is required to auto populate DNS names.
 
 ### Can SPIRE Controller Manager be deployed in a different Pod from SPIRE Server?
 

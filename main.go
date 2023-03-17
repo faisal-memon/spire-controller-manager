@@ -147,6 +147,7 @@ func parseConfig() (spirev1alpha1.ControllerManagerConfig, ctrl.Options, error) 
 		"trust domain", ctrlConfig.TrustDomain,
 		"ignore namespaces", ctrlConfig.IgnoreNamespaces,
 		"gc interval", ctrlConfig.GCInterval,
+		"auto populate dns names", ctrlConfig.AutoPopulateDNSNames,
 		"spire server socket path", ctrlConfig.SPIREServerSocketPath)
 
 	switch {
@@ -243,13 +244,14 @@ func run(ctrlConfig spirev1alpha1.ControllerManagerConfig, options ctrl.Options)
 	}
 
 	entryReconciler := spireentry.Reconciler(spireentry.ReconcilerConfig{
-		TrustDomain:      trustDomain,
-		ClusterName:      ctrlConfig.ClusterName,
-		ClusterDomain:    ctrlConfig.ClusterDomain,
-		K8sClient:        mgr.GetClient(),
-		EntryClient:      spireClient,
-		IgnoreNamespaces: ctrlConfig.IgnoreNamespaces,
-		GCInterval:       ctrlConfig.GCInterval,
+		TrustDomain:          trustDomain,
+		ClusterName:          ctrlConfig.ClusterName,
+		ClusterDomain:        ctrlConfig.ClusterDomain,
+		K8sClient:            mgr.GetClient(),
+		EntryClient:          spireClient,
+		IgnoreNamespaces:     ctrlConfig.IgnoreNamespaces,
+		AutoPopulateDNSNames: ctrlConfig.AutoPopulateDNSNames,
+		GCInterval:           ctrlConfig.GCInterval,
 	})
 
 	federationRelationshipReconciler := spirefederationrelationship.Reconciler(spirefederationrelationship.ReconcilerConfig{
@@ -285,10 +287,11 @@ func run(ctrlConfig spirev1alpha1.ControllerManagerConfig, options ctrl.Options)
 	//+kubebuilder:scaffold:builder
 
 	if err = (&controllers.PodReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Triggerer:        entryReconciler,
-		IgnoreNamespaces: ctrlConfig.IgnoreNamespaces,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Triggerer:            entryReconciler,
+		IgnoreNamespaces:     ctrlConfig.IgnoreNamespaces,
+		AutoPopulateDNSNames: ctrlConfig.AutoPopulateDNSNames,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		return err

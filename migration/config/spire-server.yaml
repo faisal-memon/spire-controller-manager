@@ -16,9 +16,6 @@ rules:
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get"]
-- apiGroups: [""]
-  resources: ["endpoints"]
-  verbs: ["get", "list", "watch"]
   # allow TokenReview requests (to verify service account tokens for PSAT
   # attestation)
 - apiGroups: ["authentication.k8s.io"]

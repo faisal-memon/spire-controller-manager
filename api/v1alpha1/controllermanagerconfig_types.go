@@ -32,6 +32,9 @@ type ControllerManagerConfig struct {
 	// ControllerManagerConfigurationSpec returns the contfigurations for controllers
 	cfgv1alpha1.ControllerManagerConfigurationSpec `json:",inline"`
 
+	// AutoPopulateDNSNames indicates whether or not to auto populate service DNS names.
+	AutoPopulateDNSNames bool `json:"autoPopulateDNSNames,omitempty"`
+
 	// ClusterName is the cluster name
 	ClusterName string `json:"clusterName"`
 

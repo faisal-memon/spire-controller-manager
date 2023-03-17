@@ -40,12 +40,13 @@ import (
 )
 
 type ReconcilerConfig struct {
-	TrustDomain      spiffeid.TrustDomain
-	ClusterName      string
-	ClusterDomain    string
-	EntryClient      spireapi.EntryClient
-	K8sClient        client.Client
-	IgnoreNamespaces stringset.StringSet
+	TrustDomain          spiffeid.TrustDomain
+	ClusterName          string
+	ClusterDomain        string
+	EntryClient          spireapi.EntryClient
+	K8sClient            client.Client
+	IgnoreNamespaces     stringset.StringSet
+	AutoPopulateDNSNames bool
 
 	// GCInterval how long to sit idle (i.e. untriggered) before doing
 	// another reconcile.
@@ -243,7 +244,7 @@ func (r *entryReconciler) renderPodEntry(ctx context.Context, spec *spirev1alpha
 		return nil, client.IgnoreNotFound(err)
 	}
 	endpointsList := &corev1.EndpointsList{}
-	if spec.AutoPopulateDNSNames {
+	if r.config.AutoPopulateDNSNames && spec.AutoPopulateDNSNames {
 		if err := r.config.K8sClient.List(ctx, endpointsList, client.InNamespace(pod.Namespace), client.MatchingFields{reconciler.EndpointUID: string(pod.UID)}); err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
