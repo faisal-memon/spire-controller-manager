@@ -285,10 +285,11 @@ func run(ctrlConfig spirev1alpha1.ControllerManagerConfig, options ctrl.Options)
 	//+kubebuilder:scaffold:builder
 
 	if err = (&controllers.PodReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Triggerer:        entryReconciler,
-		IgnoreNamespaces: ctrlConfig.IgnoreNamespaces,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Triggerer:            entryReconciler,
+		IgnoreNamespaces:     ctrlConfig.IgnoreNamespaces,
+		AutoPopulateDNSNames: ctrlConfig.AutoPopulateDNSNames,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		return err

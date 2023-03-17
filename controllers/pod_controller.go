@@ -31,9 +31,10 @@ import (
 // PodReconciler reconciles a Pod object
 type PodReconciler struct {
 	client.Client
-	Scheme           *runtime.Scheme
-	Triggerer        reconciler.Triggerer
-	IgnoreNamespaces stringset.StringSet
+	Scheme               *runtime.Scheme
+	Triggerer            reconciler.Triggerer
+	IgnoreNamespaces     stringset.StringSet
+	AutoPopulateDNSNames bool
 }
 
 //+kubebuilder:rbac:groups=spire.spiffe.io,resources=clusterspiffeids,verbs=get;list;watch;create;update;patch;delete
@@ -58,26 +59,28 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl
 func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Index endpoints by UID. Later when we reconcile the Pod this will make it easy to find the associated endpoints
 	// and auto populate DNS names.
-	err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Endpoints{}, reconciler.EndpointUID, func(rawObj client.Object) []string {
-		endpoints := rawObj.(*corev1.Endpoints)
-		var podUIDs []string
-		for _, subset := range endpoints.Subsets {
-			for _, address := range subset.Addresses {
-				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-					podUIDs = append(podUIDs, string(address.TargetRef.UID))
+	if r.AutoPopulateDNSNames {
+		err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Endpoints{}, reconciler.EndpointUID, func(rawObj client.Object) []string {
+			endpoints := rawObj.(*corev1.Endpoints)
+			var podUIDs []string
+			for _, subset := range endpoints.Subsets {
+				for _, address := range subset.Addresses {
+					if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+						podUIDs = append(podUIDs, string(address.TargetRef.UID))
+					}
+				}
+				for _, address := range subset.NotReadyAddresses {
+					if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+						podUIDs = append(podUIDs, string(address.TargetRef.UID))
+					}
 				}
 			}
-			for _, address := range subset.NotReadyAddresses {
-				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-					podUIDs = append(podUIDs, string(address.TargetRef.UID))
-				}
-			}
-		}
 
-		return podUIDs
-	})
-	if err != nil {
-		return err
+			return podUIDs
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
