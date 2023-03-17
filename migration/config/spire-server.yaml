@@ -16,9 +16,6 @@ rules:
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get"]
-- apiGroups: [""]
-  resources: ["endpoints"]
-  verbs: ["get", "list", "watch"]
   # allow TokenReview requests (to verify service account tokens for PSAT
   # attestation)
 - apiGroups: ["authentication.k8s.io"]
@@ -193,7 +190,8 @@ spec:
             - name: spire-server-socket
               mountPath: /tmp/spire-server/private
         - name: spire-controller-manager
-          image: ghcr.io/spiffe/spire-controller-manager:nightly
+          #image: ghcr.io/spiffe/spire-controller-manager:nightly
+          image: spire-controller-manager:latest-local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9443

@@ -289,7 +289,7 @@ func run(ctrlConfig spirev1alpha1.ControllerManagerConfig, options ctrl.Options)
 		Scheme:           mgr.GetScheme(),
 		Triggerer:        entryReconciler,
 		IgnoreNamespaces: ctrlConfig.IgnoreNamespaces,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, setupLog); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		return err
 	}

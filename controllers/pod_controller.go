@@ -18,10 +18,13 @@ package controllers
 
 import (
 	"context"
+	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/spiffe/spire-controller-manager/pkg/reconciler"
 	"github.com/spiffe/spire-controller-manager/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,10 +58,12 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager, log logr.Logger) error {
 	// Index endpoints by UID. Later when we reconcile the Pod this will make it easy to find the associated endpoints
 	// and auto populate DNS names.
-	err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Endpoints{}, reconciler.EndpointUID, func(rawObj client.Object) []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Endpoints{}, reconciler.EndpointUID, func(rawObj client.Object) []string {
 		endpoints := rawObj.(*corev1.Endpoints)
 		var podUIDs []string
 		for _, subset := range endpoints.Subsets {
@@ -77,7 +82,7 @@ func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return podUIDs
 	})
 	if err != nil {
-		return err
+		log.Error(err, "unable to setup Endpoint Indexer, disabling autoPopulateDNSNames field of ClusterSPIFFEID CRD.", "reason", k8serrors.ReasonForError(err))
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
